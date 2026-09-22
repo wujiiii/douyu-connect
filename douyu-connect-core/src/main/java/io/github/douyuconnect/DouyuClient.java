@@ -27,6 +27,10 @@ public final class DouyuClient implements AutoCloseable {
     public DouyuClient(ClientOptions options, Consumer<ClientEvent> events) {
         this(options, new io.github.douyuconnect.transport.NettyTransport(), events);
     }
+    /** Explicit TLS policy selection; compatibility mode has a process-wide JSSE effect. */
+    public DouyuClient(ClientOptions options, TlsMode tlsMode, Consumer<ClientEvent> events) {
+        this(options, new io.github.douyuconnect.transport.NettyTransport(tlsMode), events);
+    }
 
     /** Owns and closes the supplied transport. Listeners must not block I/O or lifecycle futures. */
     public DouyuClient(ClientOptions options, Transport transport, Consumer<ClientEvent> events) {

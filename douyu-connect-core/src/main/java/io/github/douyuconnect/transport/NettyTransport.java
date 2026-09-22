@@ -2,6 +2,7 @@ package io.github.douyuconnect.transport;
 import java.net.URI;
 import java.time.Duration;
 import io.github.douyuconnect.protocol.PacketCodec;
+import io.github.douyuconnect.config.TlsMode;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
@@ -23,10 +24,13 @@ public final class NettyTransport implements Transport {
     private final SslContext sslContext;
     private boolean closed;
 
-    public NettyTransport() { this(2); }
-    public NettyTransport(int threads) {
+    public NettyTransport() { this(2,TlsMode.SYSTEM_DEFAULT); }
+    public NettyTransport(int threads) { this(threads,TlsMode.SYSTEM_DEFAULT); }
+    public NettyTransport(TlsMode mode) { this(2,mode); }
+    /** Select DOUYU_COMPATIBLE before any other JSSE/TLS initialization in this JVM. */
+    public NettyTransport(int threads, TlsMode mode) {
         if (threads < 1) throw new IllegalArgumentException("threads must be positive");
-        try { sslContext = SslContextBuilder.forClient().build(); }
+        try { sslContext = TlsSupport.createContext(mode); }
         catch (javax.net.ssl.SSLException e) { throw new IllegalStateException("Cannot initialize TLS",e); }
         group = new NioEventLoopGroup(threads, (java.util.concurrent.ThreadFactory) task -> {
             Thread thread = new Thread(task,"douyu-io"); thread.setDaemon(true); return thread;

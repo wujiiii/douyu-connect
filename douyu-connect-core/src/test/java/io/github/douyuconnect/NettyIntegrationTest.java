@@ -20,6 +20,22 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NettyIntegrationTest {
+    @Test void rejectionAndExtensionFieldsSurviveActualWebSocketTransport() throws Exception {
+        try (Server server = new Server(); DouyuClient client = new DouyuClient(ClientTest.options(),new NettyTransport(),event -> {})) {
+            server.chatReply = "type@=chatres/res@=391/cd@=5/len@=50/extension@=retained/";
+            SenderConfig sender = new SenderConfig(ClientTest.sender("test-token").credentials(),List.of(server.uri()));
+            ClientTest.await(client.connect("123",new ConnectionConfig(List.of(server.uri()),sender)));
+            SendResult result = ClientTest.await(client.sendChat("123","local-test"));
+            assertEquals(SendResult.Status.REJECTED,result.status());
+            assertEquals("391",result.serverCode());
+            assertEquals(SendFailureReason.ACCOUNT_VERIFICATION_REQUIRED,result.reason());
+            assertEquals("需要账号安全验证",result.message());
+            assertEquals("retained",result.rawResponse().get("extension"));
+            assertEquals("5",result.rawResponse().get("cd"));
+            assertEquals("local-test",server.chats.poll(2,TimeUnit.SECONDS));
+            assertTrue(server.chats.isEmpty());
+        }
+    }
     @Test void realWebSocketLoginFragmentedReceiveSendAndCredentialReplacement() throws Exception {
         try (Server server = new Server(); DouyuClient client = new DouyuClient(ClientTest.options(), new NettyTransport(), event -> {})) {
             BlockingQueue<DouyuMessage> gifts = new LinkedBlockingQueue<>();
@@ -47,6 +63,7 @@ class NettyIntegrationTest {
         final EventLoopGroup group = new NioEventLoopGroup(1);
         final ChannelGroup channels = new DefaultChannelGroup(group.next());
         final BlockingQueue<String> chats = new LinkedBlockingQueue<>();
+        volatile String chatReply = "type@=chatres/res@=0/";
         final java.util.concurrent.atomic.AtomicInteger receiveLogins = new java.util.concurrent.atomic.AtomicInteger();
         final java.util.concurrent.atomic.AtomicInteger sendLogins = new java.util.concurrent.atomic.AtomicInteger();
         final Channel server;
@@ -75,7 +92,7 @@ class NettyIntegrationTest {
                             context.writeAndFlush(new ContinuationWebSocketFrame(true,0,Unpooled.wrappedBuffer(Arrays.copyOfRange(packet,8,packet.length))));
                             reply(context,"type@=gbroadcast/btype@=pandora/txt5@=2个/");
                         }
-                        case "chatmessage" -> { chats.add(fields.get("content")); reply(context,"type@=chatres/res@=0/"); }
+                        case "chatmessage" -> { chats.add(fields.get("content")); reply(context,chatReply); }
                         case "mrkl", "keeplive" -> reply(context,"type@=mrkl/");
                         default -> { }
                     }

@@ -3,7 +3,8 @@ package io.github.douyuconnect.example;
 import io.github.douyuconnect.*;
 import io.github.douyuconnect.config.*;
 import io.github.douyuconnect.message.*;
-import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Scanner;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -12,9 +13,13 @@ import java.util.concurrent.atomic.AtomicLong;
 public final class Main {
     private Main() {}
     public static void main(String[] args) throws Exception {
+        var arguments = new ArrayList<>(Arrays.asList(args));
+        TlsMode tlsMode = arguments.remove("--douyu-tls") ? TlsMode.DOUYU_COMPATIBLE : TlsMode.SYSTEM_DEFAULT;
+        args = arguments.toArray(String[]::new);
         if (args.length > 0 && args[0].equals("--help")) { help(); return; }
         AtomicLong received = new AtomicLong();
-        try (DouyuClient client = new DouyuClient(ClientOptions.defaults(), event -> System.out.println("event " + event))) {
+        try (DouyuClient client = new DouyuClient(ClientOptions.defaults(), tlsMode, event -> System.out.println("event " + event))) {
+            System.out.println("TLS_MODE=" + tlsMode);
             client.subscribe(MessageFilter.all(), message -> {
                 received.incrementAndGet();
                 if (message.category() != Category.GENERIC) {
@@ -31,7 +36,7 @@ public final class Main {
                 System.out.println("RECEIVED_PACKETS " + received.get());
                 return;
             }
-            if (args.length != 0) throw new IllegalArgumentException("Use --help or --observe ROOM SECONDS");
+            if (args.length != 0) throw new IllegalArgumentException("Use --help or [--douyu-tls] --observe ROOM SECONDS");
             help();
             try (Scanner input = new Scanner(System.in)) {
                 while (input.hasNextLine()) {
@@ -72,7 +77,8 @@ public final class Main {
         return value;
     }
     private static void help() {
-        System.out.println("Read-only observation: --observe ROOM SECONDS");
+        System.out.println("Read-only observation: [--douyu-tls] --observe ROOM SECONDS");
+        System.out.println("--douyu-tls explicitly enables verified TLS 1.2/RSA compatibility for this JVM; certificate/hostname validation stays on.");
         System.out.println("Interactive commands: connect ROOM | disconnect ROOM | status ROOM | reconnect ROOM [RECEIVE|SEND|ALL]");
         System.out.println("Optional sending: sender ROOM (load env) | sender-off ROOM | send ROOM TEXT | quit");
         System.out.println("Sender env: DOUYU_DEVICE_ID, DOUYU_USER_ID, DOUYU_USERNAME, DOUYU_LOGIN_TICKET_ID, DOUYU_SESSION_TOKEN, optional DOUYU_BIZ");

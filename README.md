@@ -27,12 +27,12 @@ java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar 
 匿名观察指定房间 10 秒（不加载账号、不发送弹幕）：
 
 ```shell
-java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar --observe 4489985 10
+java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar --douyu-tls --observe 4489985 10
 ```
 
-也可以不带参数启动交互示例，输入 `connect 房间号`、`disconnect 房间号`、`status 房间号`、`reconnect 房间号 SEND`、`quit`。请使用实际数字房间 ID；短号/链接解析不在模块范围内。
+也可以只带 `--douyu-tls` 启动交互示例，输入 `connect 房间号`、`disconnect 房间号`、`status 房间号`、`reconnect 房间号 SEND`、`quit`。不带该选项则保留系统默认 TLS 配置。请使用实际数字房间 ID；短号/链接解析不在模块范围内。
 
-**真实连接验证限制：** 2026-09-22 在本机 Temurin 17.0.18.8 上访问斗鱼接收端点时，服务端在 TLS 阶段返回 `handshake_failure`。最小 JDK TLS 程序也复现了此错误，尚未完成真实收流验收。未禁用证书/主机名校验或修改 JVM 安全算法策略。离线测试和本地 WebSocket 模拟服务验证通过；详情见 [验证记录](docs/verification.md)。
+**TLS 兼容模式已正式提供：** 本机系统默认 TLS 策略与斗鱼端点不兼容，可显式选择 `TlsMode.DOUYU_COMPATIBLE`。它使用已验证的 TLS 1.2 套件，并保留证书及主机名校验；必须在进程首次 TLS 初始化前启用，影响范围见下文。正式程序已完成真实匿名接收验证，3 秒收到 11 个协议包（包含聊天消息）。历史真实发送测试得到 `391`，现已映射为 `ACCOUNT_VERIFICATION_REQUIRED`（需要账号安全验证），不能算成功发送。详情见 [验证记录](docs/verification.md)。
 
 ## 快速接入
 
@@ -41,8 +41,9 @@ import io.github.douyuconnect.*;
 import io.github.douyuconnect.config.*;
 import io.github.douyuconnect.message.*;
 
-DouyuClient client = new DouyuClient(ClientOptions.defaults(), event -> {
-    // 状态、认证失败、回调异常、队列溢出；不要在这里阻塞等待 close()。
+// 在进程首次 TLS 初始化前选择；此模式会调整 JVM 内存中的 JSSE 安全属性。
+DouyuClient client = new DouyuClient(ClientOptions.defaults(), TlsMode.DOUYU_COMPATIBLE, event -> {
+    // 状态、认证失败、发送拒绝原因、回调异常、队列溢出；不要在这里阻塞等待 close()。
     System.out.println(event);
 });
 
@@ -184,6 +185,10 @@ client.disconnect(roomId).thenCompose(ignored ->
 
 client.sendChat(roomId, "弹幕内容").thenAccept(result -> {
     System.out.println(result.status());
+    System.out.println(result.serverCode()); // 例如 391
+    System.out.println(result.reason());     // ACCOUNT_VERIFICATION_REQUIRED
+    System.out.println(result.message());    // 需要账号安全验证
+    var fields = result.rawResponse();       // 完整且不可变的 chatres 字段，如 cd、len
 });
 
 // 只关闭发送能力
@@ -199,7 +204,7 @@ client.updateSender(roomId, SenderConfig.disabled());
 | SendResult.Status | 意义 |
 |---|---|
 | ACKNOWLEDGED | 收到 chatres/res=0；不等于已验证页面可见 |
-| REJECTED | 收到非零发送回执，serverCode 保留返回值 |
+| REJECTED | 收到非零发送回执，serverCode 保留返回值，reason/message 提供已核实的原因 |
 | NOT_READY | 发送通道不可用，本次未入队 |
 | QUEUE_FULL | 等待队列已满，本次未入队 |
 | CANCELLED | 断开/更新/失败时取消了尚未发出的请求 |
@@ -207,9 +212,31 @@ client.updateSender(roomId, SenderConfig.disabled());
 
 更新凭据或重连会取消旧等待队列，旧在途请求返回 UNKNOWN。回执超时会替换发送连接，避免迟到回执匹配下一条；不自动重发结果未知的消息。调用方不能直接把 UNKNOWN 当作未送达后重发。
 
+发送回执新增 `reason()`、`message()`、`rawResponse()`；原有 status/serverCode 和两参数构造器继续可用。已验证的码为 2、5、6、206、208、289、290、391，未知码保留原值并返回 UNKNOWN_SERVER_CODE。连接错误码不混入这份映射，完整说明和依据见 [发送回执原因表](docs/send-response-codes.md)。
+
+服务端拒绝还会通过 ClientEvent 回调记录 SEND_REJECTED 事件，包含房间、连接、返回码和原因，不含弹幕正文或完整原始回执。下游可将这些事件写入业务日志。发送 Future 是每次请求的直接结果，回执不另外进入普通消息订阅流。
+
 交互示例中的 `sender 房间号` 从环境变量加载凭据，只有再执行 `send 房间号 内容` 才发送文本。变量为 DOUYU_DEVICE_ID、DOUYU_USER_ID、DOUYU_USERNAME、DOUYU_LOGIN_TICKET_ID、DOUYU_SESSION_TOKEN，可选 DOUYU_BIZ。运行中真正的动态凭据更新由业务调用 API 传入新对象完成。
 
 ## 配置、线程与扩展
+
+### TLS 选择
+
+默认构造器保持 `TlsMode.SYSTEM_DEFAULT`，不改变 JVM 安全属性。斗鱼兼容模式显式启用：
+
+```java
+var client = new DouyuClient(
+    ClientOptions.defaults(), TlsMode.DOUYU_COMPATIBLE, event -> System.out.println(event));
+// 也可以直接构造 new NettyTransport(2, TlsMode.DOUYU_COMPATIBLE)。
+```
+
+`DOUYU_COMPATIBLE` 固定使用 JDK TLS provider、TLSv1.2 和 `TLS_RSA_WITH_AES_256_GCM_SHA384`，系统信任链和 HTTPS 主机名校验仍然开启。不会信任所有证书，不会自动降级为明文，也不依赖测试程序中的反射。
+
+该方案与已验证的临时方案一致：在 **JVM 进程内存中** 从 `jdk.tls.disabledAlgorithms` 移除 `TLS_RSA_*`/旧格式 `TLS_RSA_` 这一禁用规则，保留其余规则，不改磁盘上的 JDK 文件。这个属性不是单个客户端私有的，可能影响同进程其他 JSSE 使用者；关闭客户端不会恢复它或清空 JSSE 缓存。需要隔离时，将斗鱼连接库放在独立 JVM 中运行。
+
+必须在首次 JSSE/TLS 初始化之前创建兼容模式客户端，例如在启动 Spring 或其他 HTTPS SDK 之前。若旧策略已缓存，或运行环境另有规则禁止这个套件，会在构造客户端时明确失败，不再默默进入握手重试。`SYSTEM_DEFAULT` 也不能撤销同进程中已经发生的兼容模式启用。
+
+该 RSA 密钥交换套件不具备前向保密；本选项用于服务端兼容。可参阅 [Oracle JDK 安全更新说明](https://www.oracle.com/java/technologies/javase/17all-relnotes.html)。
 
 `ClientOptions` 默认连接/登录超时 10s，心跳 45s，静默阈值 90s，重试基础 1s、上限 60s（含抖动），发送间隔 1500ms，回执超时 10s，关闭等待 5s，消息队列 4096，发送等待队列 100，回调线程 4，协议包长度上限 128KiB。这些是模块初始参数，不代表平台承诺的限制。静默检测在心跳检查点执行。
 

@@ -11,6 +11,26 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClientTest {
+    @Test void rejectionReasonAndFullReceiptReachCallerAndClientEvent() throws Exception {
+        FakeTransport transport = new FakeTransport(); BlockingQueue<ClientEvent> events = new LinkedBlockingQueue<>();
+        try (DouyuClient client = new DouyuClient(options(),transport,events::add)) {
+            var connected = client.connect("1",new ConnectionConfig(RECEIVE.receiveEndpoints(),sender("test")));
+            FakeWire receive = next(transport), send = next(transport); ready(receive); ready(send); await(connected);
+            var result = client.sendChat("1","test-only");
+            send.listener.onMessage("type@=chatres/res@=391/cd@=5/len@=50/extension@=private-server-field/");
+            SendResult returned = await(result);
+            assertEquals(SendFailureReason.ACCOUNT_VERIFICATION_REQUIRED,returned.reason());
+            assertEquals("需要账号安全验证",returned.message());
+            assertEquals("5",returned.rawResponse().get("cd"));
+            ClientEvent rejection;
+            do { rejection = events.poll(2,TimeUnit.SECONDS); assertNotNull(rejection); }
+            while (!rejection.kind().name().equals("SEND_REJECTED"));
+            assertEquals("1",rejection.roomId()); assertEquals(ChannelKind.SEND,rejection.channel());
+            assertTrue(rejection.detail().contains("391")); assertTrue(rejection.detail().contains("ACCOUNT_VERIFICATION_REQUIRED"));
+            assertFalse(rejection.detail().contains("test-only")); assertFalse(rejection.detail().contains("private-server-field"));
+            assertEquals(1,send.sent.stream().filter(text -> text.contains("type@=chatmessage/")).count());
+        }
+    }
     static final ConnectionConfig RECEIVE = new ConnectionConfig(List.of(URI.create("ws://localhost:1234/")), SenderConfig.disabled());
     static ClientOptions options() { return new ClientOptions(Duration.ofSeconds(2), Duration.ofSeconds(10), Duration.ofSeconds(30),
         Duration.ofMillis(15), Duration.ofMillis(30), Duration.ZERO, Duration.ofMillis(150), Duration.ofSeconds(2), 100, 10, 2, 4096); }

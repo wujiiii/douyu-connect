@@ -172,8 +172,12 @@ final class RoomSession {
         }
         if (lane.kind == ChannelKind.SEND && "chatres".equals(type) && inFlight != null && fields.containsKey("res")) {
             PendingSend completed = inFlight; inFlight = null; cancel(receiptTimer); receiptTimer = null;
-            String code = fields.get("res");
-            completed.result.complete(new SendResult("0".equals(code) ? SendResult.Status.ACKNOWLEDGED : SendResult.Status.REJECTED, code));
+            SendResult result = SendResult.fromChatResponse(fields);
+            if (result.status() == SendResult.Status.REJECTED) {
+                event(lane,ClientEvent.Kind.SEND_REJECTED,"chatres res=" + safeCode(result.serverCode())
+                    + " reason=" + result.reason() + " message=" + result.message());
+            }
+            completed.result.complete(result);
             pump();
         }
     }
