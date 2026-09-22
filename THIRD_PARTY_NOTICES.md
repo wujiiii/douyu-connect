@@ -16,6 +16,11 @@ Message field mappings were checked against the local RuoYi-Vue `ruoyi-danmu` ha
 `62fd2240` and the working tree inspected on 2026-09-22. The original RuoYi project is MIT licensed,
 Copyright (c) 2018 RuoYi. No business service, database mapper or Redis implementation is bundled.
 
+The documented original-field getters in `message/` also reference the Apache-2.0 licensed
+`opensource-douyu-barrage/model/BaseMessage.java` field definitions (attribution above).
+They preserve decoded field values, add JavaBean accessors and distinguish protocol room IDs
+from connection metadata; no default counts, gift pricing or account business rules are copied.
+
 Netty is a runtime dependency licensed under Apache-2.0; JUnit is a test-only dependency licensed
 under EPL-2.0. The example executable bundles Netty and retains its packaged notices.
 

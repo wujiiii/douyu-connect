@@ -44,4 +44,14 @@ class ClassificationTest {
         assertEquals("999", open.context().rawFields().get("rid"));
         assertThrows(UnsupportedOperationException.class, () -> open.context().rawFields().put("x", "y"));
     }
+
+    @Test void unrelatedOrMissingTypesNeverBecomeFanRenewals() {
+        for (String type : new String[]{"", "chatmsg", "unknown", "DFOBC", "dfobc ", null}) {
+            MessageContext context = new MessageContext("123","room-1","connection-1",1,Instant.EPOCH,
+                type,"",Map.of(),"",java.util.List.of());
+            FansBadgeMessage manuallyWrapped = new FansBadgeMessage(context);
+            assertEquals("UNKNOWN",manuallyWrapped.action().name(),"Unexpected fan action for type: " + type);
+        }
+        assertInstanceOf(GenericMessage.class,parse("type@=unknown/"));
+    }
 }

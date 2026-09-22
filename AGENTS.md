@@ -47,6 +47,8 @@
 - `GiftMessage` 表示 `type=dgb`，不表示已经确认为普通礼物。保留 `gfid`、`pid`、`gfcnt`、`hits`，不重写 ID、不求差、不相乘。
 - `btype=pandora` 分类为潘多拉广播，不进行开箱关联；梦幻岛礼物仍通过 `dgb` 转发。未知类型通过 `GenericMessage` 保留。
 - STT 每次只解码一层；嵌套 `chatmsg` 不额外生成聊天事件。保留空值、原文、未知字段和解析诊断，不将缺失数字默认为 0 或 1。
+- 已知原协议字段提供 `getUid()`、`getRid()` 等 JavaBean getter 和中文 Javadoc；原字段 getter 保留字符串原值，原有便捷方法继续兼容。字段清单见 `docs/message-fields.md`，新增已知字段应同步 getter、注释和验证。
+- 钻粉动作仅明确匹配 `dfobc -> OPEN`、`dfrbc -> RENEW`；未知、空或 null 类型为 UNKNOWN，不允许将“不是开通”默认视为续费。
 - 本地 `sequence` 不是平台唯一 ID，不能承诺去重或断线补发。重连保持房间实例并更换连接 ID；断开完成后再次连接产生新房间实例。
 - 队列有上限。当前溢出策略是报告 `QUEUE_OVERFLOW`、主动断开该房间、排空已接纳消息，由业务显式恢复；不能静默丢包后仍声称消息连续。
 
@@ -99,7 +101,7 @@ mvn -B -ntp -pl douyu-connect-core '-Dtest=TlsCompatibilityTest' test
 mvn -B -ntp install
 ```
 
-测试职责：协议改动看 `ProtocolTest`，分类改动看 `ClassificationTest`，连接/并发看 `ClientTest`，真实本地 WebSocket 收发看 `NettyIntegrationTest`，失败原因看 `SendResultTest`，TLS 看 `TlsCompatibilityTest`/`TlsProcessProbe`。
+测试职责：协议改动看 `ProtocolTest`，分类改动看 `ClassificationTest`，原字段 getter 看 `MessageGetterTest`，连接/并发看 `ClientTest`，真实本地 WebSocket 收发看 `NettyIntegrationTest`，失败原因看 `SendResultTest`，TLS 看 `TlsCompatibilityTest`/`TlsProcessProbe`。
 
 新增行为或修复缺陷，先添加能复现问题的测试，再实现并执行相应验证；网络/并发场景优先使用伪传输、本地服务器、锁存器和有超时的 Future，不依赖真实账号或任意 sleep。改动代码后完成 `mvn verify`；纯文档改动检查内容、路径及 diff 即可。历史 39 项通过是基线，不是新改动已验证的证据，也不是固定测试数量要求。
 

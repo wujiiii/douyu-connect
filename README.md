@@ -118,7 +118,7 @@ Subscription all = client.subscribe(MessageFilter.all(), message -> {
 |---|---|---|---|
 | CHAT | ChatMessage | type=chatmsg | userId、nickname、avatar、text、messageId |
 | GIFT | GiftMessage | type=dgb | userId、nickname、avatar、giftId、propId、giftName、count、hits、recipientName |
-| FANS_BADGE | FansBadgeMessage | type=dfobc/dfrbc | action=OPEN/RENEW、userId、nickname、avatar、recipientName、months、rawPrice |
+| FANS_BADGE | FansBadgeMessage | type=dfobc/dfrbc | action=OPEN/RENEW；手动构造且类型不匹配时为 UNKNOWN，另有 userId、nickname、avatar、recipientName、months、rawPrice |
 | NOBLE | NobleMessage | type=anbc | userId、nickname、avatar、recipientName、level |
 | PANDORA_BROADCAST | PandoraBroadcastMessage | 广播子类型 btype=pandora | userId、giftName、quantityText、propId、chatFields |
 | VOICE_DANMU | VoiceDanmuMessage | 广播子类型 btype=voiceDanmu | userId、rawPrice、chatFields |
@@ -132,6 +132,22 @@ Subscription all = client.subscribe(MessageFilter.all(), message -> {
 数字便捷字段为可空 `Long`，缺失/空字段返回 null，格式错误还会加入 `context.parseIssues()`；原始值仍在 `rawFields`。完整字段以不可变 `Map<String,String>` 保存，嵌套 STT 字段按需使用 `context.nested("chatmsg")` 解码。未知字段不会在模型映射时丢失；原文也保留供诊断。
 
 消息信封包含 `roomId`（连接房间）、`roomInstanceId`、`connectionId`、`sequence`、`receivedAt`、`type`、`btype`、`rawFields`、`rawText`、`parseIssues`。广播原始 rid 不被连接房间号覆盖。
+
+所有消息均提供标准 JavaBean getter。原协议字段按原名访问，如 `getUid()`、`getRid()`、`getGfid()`、`getGfcnt()`、`getHits()`；字段含义、缺失值与是否换算均有中文 Javadoc。原字段 getter 返回原始字符串，因此 `getGfcnt()` 可保留 `"0002"`，已有 `count()`/`getCount()` 则提供可空 Long 视图。旧的 `userId()`、`giftId()` 等调用方式继续可用。
+
+```java
+client.subscribe(GiftMessage.class, gift -> {
+    String senderUid = gift.getUid();
+    String protocolRoomId = gift.getRid();             // 原始 rid，缺失时为 null
+    String connectionRoomId = gift.getConnectionRoomId(); // 从哪个房间连接收到
+    String countText = gift.getGfcnt();                // 不计算连击增量
+    String recipientName = gift.getReceiveNn();
+});
+```
+
+钻粉动作只显式匹配两个类型：`dfobc -> OPEN`、`dfrbc -> RENEW`。未知/空/null 类型不能推断为续费；手动构造 FansBadgeMessage 时返回 UNKNOWN，分类器本身仍只将 dfobc/dfrbc 分类为钻粉。潘多拉和语音消息的 `getChatmsg()` 保留嵌套 STT 原值，`getChatFields()` 返回内层 Map，`getChatNn()`/`getChatIc()` 访问原 Handler 读取的内层昵称/头像。
+
+字段清单以原项目 BaseMessage 和各 Handler 已定义/读取的字段为依据，见 [消息字段与 getter 对照](docs/message-fields.md)。未来上游新增的未知字段仍通过 getRawFields() 保留，不声称静态模型已穷尽所有版本的协议字段。
 
 ## 顺序和连续性
 
