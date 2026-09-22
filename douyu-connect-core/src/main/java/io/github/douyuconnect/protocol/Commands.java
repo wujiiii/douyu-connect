@@ -5,6 +5,7 @@ import java.security.*;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 /**
  * Wire templates adapted from opensource-douyu-barrage by yijianguanzhu (Apache-2.0).
  * See THIRD_PARTY_NOTICES.md. Credentials and timestamps are never logged.
@@ -12,10 +13,21 @@ import java.util.*;
 public final class Commands {
     private Commands() {}
     private static final String VK_SECRET = "r5*^5;}2#${XF[h+;'./.Q'1;,-]f'p[";
+    /**
+     * @param room 目标房间号
+     * @param credentials 接收连接传 null 以生成访客登录；发送连接传入真实账号凭据
+     * @return 对应通道的 loginreq 报文，不混用访客身份和 Cookie 登录字段
+     */
     public static String login(String room, Credentials credentials) {
         Map<String,String> fields = new LinkedHashMap<>();
         fields.put("type","loginreq"); fields.put("roomid",room);
-        if (credentials != null) {
+        if (credentials == null) {
+            // Match RandomUtil.randomInt(min, max): inclusive lower bound, exclusive upper bound.
+            int uid = ThreadLocalRandom.current().nextInt(10000,19999);
+            String username = "visitor" + ThreadLocalRandom.current().nextInt(1000000000,1999999999);
+            fields.put("dfl",""); fields.put("username",username); fields.put("uid",Integer.toString(uid));
+            fields.put("ver","20220825"); fields.put("aver","218101901"); fields.put("ct","0");
+        } else {
             long tick = Instant.now().getEpochSecond();
             fields.put("username",credentials.username()); fields.put("password","");
             fields.put("ltkid",Long.toString(credentials.loginTicketId())); fields.put("biz",Integer.toString(credentials.biz()));

@@ -11,6 +11,27 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClientTest {
+    @Test void receiveChannelUsesVisitorLoginEvenWhenSenderIsEnabledAndAfterReconnect() throws Exception {
+        FakeTransport transport = new FakeTransport();
+        try (DouyuClient client = new DouyuClient(options(),transport,event -> {})) {
+            var connected = client.connect("1",new ConnectionConfig(RECEIVE.receiveEndpoints(),sender("test-token")));
+            FakeWire receive = next(transport), send = next(transport);
+            ready(receive); ready(send); await(connected);
+            var receiveLogin = io.github.douyuconnect.protocol.Stt.decode(receive.sent.get(0));
+            var sendLogin = io.github.douyuconnect.protocol.Stt.decode(send.sent.get(0));
+            assertEquals("20220825",receiveLogin.get("ver"));
+            assertTrue(receiveLogin.get("username").startsWith("visitor"));
+            assertEquals("",receiveLogin.get("dfl")); assertFalse(receiveLogin.containsKey("stk"));
+            assertEquals("user",sendLogin.get("username")); assertEquals("test-token",sendLogin.get("stk"));
+            assertEquals("20180222",sendLogin.get("ver")); assertFalse(sendLogin.containsKey("dfl"));
+            var reconnecting = client.reconnect("1",ReconnectScope.RECEIVE);
+            FakeWire replacement = next(transport); ready(replacement); await(reconnecting);
+            var replacementLogin = io.github.douyuconnect.protocol.Stt.decode(replacement.sent.get(0));
+            assertTrue(replacementLogin.get("username").startsWith("visitor"));
+            assertEquals("218101901",replacementLogin.get("aver"));
+            assertFalse(send.closed);
+        }
+    }
     @Test void rejectionReasonAndFullReceiptReachCallerAndClientEvent() throws Exception {
         FakeTransport transport = new FakeTransport(); BlockingQueue<ClientEvent> events = new LinkedBlockingQueue<>();
         try (DouyuClient client = new DouyuClient(options(),transport,events::add)) {

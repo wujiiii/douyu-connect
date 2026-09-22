@@ -63,6 +63,7 @@
 - 不在业务消息/事件回调中阻塞等待自身的 `disconnect`、`cancel` 或 `close`。
 - `connect` 等操作的 Future 反映本次尝试，网络失败后的后台恢复通过事件或状态查询观察。`READY` 表示登录响应成功且初始化请求已写入，不虚构入组确认报文。
 - 默认接收端点为 `danmuproxy.douyu.com:8501~8504`，发送端点为 `wsproxy.douyu.com:6671~6675`。每房间、每通道独立顺序轮换，不是随机端口；地址可配置。
+- 普通接收 loginreq 每次尝试生成随机访客 uid/username，并包含 dfl 空值、ver=20220825、aver=218101901、ct=0；这不是发送通道的登录模板。发送通道继续使用 Cookie 凭据及原有版本字段，不能混用。
 
 ### 发送与回执
 
@@ -101,7 +102,7 @@ mvn -B -ntp -pl douyu-connect-core '-Dtest=TlsCompatibilityTest' test
 mvn -B -ntp install
 ```
 
-测试职责：协议改动看 `ProtocolTest`，分类改动看 `ClassificationTest`，原字段 getter 看 `MessageGetterTest`，连接/并发看 `ClientTest`，真实本地 WebSocket 收发看 `NettyIntegrationTest`，失败原因看 `SendResultTest`，TLS 看 `TlsCompatibilityTest`/`TlsProcessProbe`。
+测试职责：协议编解码看 `ProtocolTest`，登录报文看 `CommandsTest`，分类改动看 `ClassificationTest`，原字段 getter 看 `MessageGetterTest`，连接/并发看 `ClientTest`，真实本地 WebSocket 收发看 `NettyIntegrationTest`，失败原因看 `SendResultTest`，TLS 看 `TlsCompatibilityTest`/`TlsProcessProbe`。
 
 新增行为或修复缺陷，先添加能复现问题的测试，再实现并执行相应验证；网络/并发场景优先使用伪传输、本地服务器、锁存器和有超时的 Future，不依赖真实账号或任意 sleep。改动代码后完成 `mvn verify`；纯文档改动检查内容、路径及 diff 即可。历史 39 项通过是基线，不是新改动已验证的证据，也不是固定测试数量要求。
 

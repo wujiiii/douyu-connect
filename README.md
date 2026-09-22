@@ -161,6 +161,14 @@ client.subscribe(GiftMessage.class, gift -> {
 
 ## 连接与重连
 
+普通接收通道使用访客登录，每次连接尝试（包括重连）生成随机 uid 与 visitor 用户名：
+
+```text
+type@=loginreq/roomid@=<房间号>/dfl@=/username@=visitor<随机数字>/uid@=<随机uid>/ver@=20220825/aver@=218101901/ct@=0/
+```
+
+uid 的范围为 `[10000, 19999)`，用户名数字部分为 `[1000000000, 1999999999)`，上界不包含，与提供的 RandomUtil.randomInt 用法一致。访客参数由模块生成，业务无需传入。即使同时启用账号发送，接收通道仍使用此访客模板；发送通道继续使用 Cookie 登录参数及其原有版本字段，不套用此模板。
+
 | 方法 | 语义 |
 |---|---|
 | connect(roomId, config) | 创建并连接房间；相同配置重复调用幂等；不同配置明确失败 |

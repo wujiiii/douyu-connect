@@ -21,6 +21,11 @@ The documented original-field getters in `message/` also reference the Apache-2.
 They preserve decoded field values, add JavaBean accessors and distinguish protocol room IDs
 from connection metadata; no default counts, gift pricing or account business rules are copied.
 
+The anonymous receive-login template follows the user-provided example and the original
+`ruoyi-danmu/client/DouyuDanmuClient.java` (RuoYi attribution above). Random visitor identifiers
+are generated with the JDK rather than introducing a Hutool dependency; authenticated sender
+login retains its separate upstream template.
+
 Netty is a runtime dependency licensed under Apache-2.0; JUnit is a test-only dependency licensed
 under EPL-2.0. The example executable bundles Netty and retains its packaged notices.
 
