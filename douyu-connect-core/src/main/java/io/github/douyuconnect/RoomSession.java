@@ -113,12 +113,12 @@ final class RoomSession {
             lane.wire = owner.transport.open(endpoint, owner.options.connectionTimeout(), owner.options.maxPacketLength(), new Transport.Listener() {
                 public void onOpen() { synchronized (RoomSession.this) { opened(lane, generation); } }
                 public void onMessage(String text) { synchronized (RoomSession.this) { message(lane, generation, text); } }
-                public void onClosed(Throwable cause) { synchronized (RoomSession.this) { failed(lane, generation, false, "Connection closed" + causeTypes(cause)); } }
+                public void onClosed(Throwable cause) { synchronized (RoomSession.this) { failed(lane, generation, false, closeDetail("Connection closed", cause)); } }
             });
             lane.deadline = owner.scheduler.schedule(() -> {
                 synchronized (RoomSession.this) { failed(lane, generation, false, "Connection/login timed out"); }
             }, owner.options.connectionTimeout().toMillis(), TimeUnit.MILLISECONDS);
-        } catch (RuntimeException e) { failed(lane, generation, false, "Connection attempt failed" + causeTypes(e)); }
+        } catch (RuntimeException e) { failed(lane, generation, false, closeDetail("Connection attempt failed", e)); }
     }
 
     private boolean current(Lane lane, long generation) { return desired && lane.generation == generation; }
@@ -275,6 +275,11 @@ final class RoomSession {
     private void state(Lane lane, ConnectionState state, String detail) { lane.state = state; event(lane,ClientEvent.Kind.STATE,detail); }
     private void event(Lane lane, ClientEvent.Kind kind, String detail) { owner.emit(new ClientEvent(roomId,lane.kind,lane.connectionId,lane.state,kind,detail)); }
     private static String safeCode(String value) { return value.matches("[0-9]{1,10}") ? value : "unknown"; }
+    private static String closeDetail(String prefix, Throwable error) { return prefix + causeTypes(error) + packetDiagnostic(error); }
+    private static String packetDiagnostic(Throwable error) {
+        for (int i = 0; error != null && i < 8; i++, error = error.getCause()) if (error instanceof io.github.douyuconnect.protocol.PacketFormatException packet) return packet.diagnostic();
+        return "";
+    }
     private static String causeTypes(Throwable error) {
         StringBuilder types = new StringBuilder();
         for (int i = 0; error != null && i < 5; i++, error = error.getCause()) types.append(" / ").append(error.getClass().getSimpleName());

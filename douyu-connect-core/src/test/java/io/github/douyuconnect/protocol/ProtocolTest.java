@@ -47,4 +47,24 @@ class ProtocolTest {
         unterminated[unterminated.length - 1] = 1;
         assertThrows(IllegalArgumentException.class, () -> new PacketCodec.Decoder(1024).feed(ByteBuffer.wrap(unterminated)));
     }
+
+    @Test void packetFailuresKeepHeaderBytesAndOmitTheBody() {
+        byte[] badLength = ByteBuffer.allocate(4).order(ByteOrder.LITTLE_ENDIAN).putInt(8).array();
+        PacketFormatException length = assertThrows(PacketFormatException.class, () -> new PacketCodec.Decoder(1024).feed(ByteBuffer.wrap(badLength)));
+        assertEquals(PacketFormatException.Code.LENGTH, length.code());
+        assertEquals(8, length.declaredLength());
+        assertEquals(-1, length.packetType());
+        assertEquals(4, length.bufferedLength());
+        assertEquals("08000000", length.diagnostic().substring(length.diagnostic().lastIndexOf(',') + 1));
+        assertFalse(length.getMessage().contains("secret-body"));
+
+        byte[] packet = PacketCodec.encode("type@=chatmsg/txt@=secret-body/", 690);
+        packet[4]++;
+        PacketFormatException header = assertThrows(PacketFormatException.class, () -> new PacketCodec.Decoder(1024).feed(ByteBuffer.wrap(packet)));
+        assertEquals(PacketFormatException.Code.HEADER, header.code());
+        assertEquals(690, header.packetType());
+        assertFalse(header.getMessage().contains("secret-body"));
+        assertFalse(header.diagnostic().contains("secret-body"));
+        assertTrue(header.header().length <= 16);
+    }
 }

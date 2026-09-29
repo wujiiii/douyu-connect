@@ -31,7 +31,7 @@ public final class PacketCodec {
                 if (pending.position() != expected) continue;
                 if (expected == 4) {
                     int length = pending.getInt(0);
-                    if (length < 9 || length > maxLength) throw new IllegalArgumentException("Invalid packet length: " + length);
+                    if (length < 9 || length > maxLength) throw malformed(PacketFormatException.Code.LENGTH, length, -1, null);
                     expected = length + 4;
                     continue;
                 }
@@ -39,17 +39,23 @@ public final class PacketCodec {
                 int type = Short.toUnsignedInt(pending.getShort(8));
                 if (pending.getInt(4) != length || (type != 689 && type != 690)
                     || pending.getShort(10) != 0 || pending.get(expected - 1) != 0) {
-                    throw new IllegalArgumentException("Invalid Douyu packet header or terminator");
+                    throw malformed(PacketFormatException.Code.HEADER, length, type, null);
                 }
                 try {
                     ByteBuffer content = pending.duplicate(); content.position(12); content.limit(expected - 1);
                     output.add(StandardCharsets.UTF_8.newDecoder().decode(content).toString());
                 } catch (CharacterCodingException e) {
-                    throw new IllegalArgumentException("Invalid UTF-8", e);
+                    throw malformed(PacketFormatException.Code.UTF8, length, type, e);
                 }
                 pending.clear(); expected = 4;
             }
             return output;
+        }
+        private PacketFormatException malformed(PacketFormatException.Code code, int declaredLength, int packetType, Throwable cause) {
+            int buffered = pending.position();
+            byte[] prefix = new byte[Math.min(16, buffered)];
+            ByteBuffer view = pending.duplicate(); view.position(0); view.limit(prefix.length); view.get(prefix);
+            return new PacketFormatException(code, declaredLength, packetType, buffered, prefix, cause);
         }
     }
 }

@@ -183,6 +183,8 @@ uid 的范围为 `[10000, 19999)`，用户名数字部分为 `[1000000000, 19999
 
 状态为 DISCONNECTED、CONNECTING、AUTHENTICATING、READY、RETRY_WAIT、AUTH_FAILED。接收/发送分别维护。明确认证失败不无限重试，需要业务更新凭据或显式重连。主动 disconnect 后不会自动恢复。
 
+进入 `RETRY_WAIT` 时，`ClientEvent.detail` 只包含固定短语和异常类名，例如 `Connection closed / IOException` 或 `No inbound messages before idle timeout`。解包失败额外追加 `| packet=种类,声明长度,包类型,已缓冲字节数,包头十六进制`。种类是 `LENGTH`、`HEADER` 或 `UTF8`，包类型尚未读到时为 `-1`，包头最多 16 字节。这段详情没有异常消息、堆栈和包体。
+
 disconnect 完成后不会再交付旧连接消息；新连接使用新代次，迟到握手、旧定时器和旧关闭通知不能复活或污染新连接。断开正在排空时，connect 会明确拒绝，请先等待断开完成。回调长期阻塞会使断开超时报错；超时不表示该回调已被强制终止。
 
 ## 发送和动态凭据

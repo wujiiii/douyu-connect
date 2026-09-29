@@ -292,6 +292,22 @@ class ClientTest {
         }
     }
 
+    @Test void packetCloseDetailsExposeHeaderDiagnosticsWithoutBodyOrExceptionText() throws Exception {
+        FakeTransport transport = new FakeTransport(); BlockingQueue<ClientEvent> events = new LinkedBlockingQueue<>();
+        byte[] header = new byte[] {8, 0, 0, 0};
+        try (DouyuClient client = new DouyuClient(options(), transport, events::add)) {
+            client.connect("1", RECEIVE); FakeWire wire = next(transport);
+            wire.listener.onClosed(new io.github.douyuconnect.protocol.PacketFormatException(
+                io.github.douyuconnect.protocol.PacketFormatException.Code.LENGTH, 8, -1, 4, header,
+                new IllegalArgumentException("secret-body")));
+            ClientEvent retry;
+            do { retry = events.poll(2, TimeUnit.SECONDS); assertNotNull(retry); } while (retry.state() != ConnectionState.RETRY_WAIT);
+            assertTrue(retry.detail().startsWith("Connection closed / PacketFormatException / IllegalArgumentException | packet=LENGTH,8,-1,4,"));
+            assertTrue(retry.detail().endsWith("08000000"));
+            assertFalse(retry.detail().contains("secret-body"));
+        }
+    }
+
     @Test void closeWaitsForClientEventListenerToFinish() throws Exception {
         FakeTransport transport = new FakeTransport(); CountDownLatch entered = new CountDownLatch(1), release = new CountDownLatch(1);
         try (DouyuClient client = new DouyuClient(options(), transport, event -> {
