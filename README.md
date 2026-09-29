@@ -2,6 +2,8 @@
 
 Java 17 的独立斗鱼连接库：动态连接/断开房间、同房间有序消息分类订阅、可选账号发送、发送参数更新和重连。无需 Spring、数据库或 Redis。
 
+源码与问题跟踪：<https://github.com/wujiiii/douyu-connect>。许可为 Apache-2.0，见 [LICENSE](LICENSE)。
+
 只解析和转发协议消息。潘多拉/梦幻岛关联、礼物去重、连击增量、价格查询、金库记账和主房间规则由业务代码处理。
 
 ## 构建与运行
@@ -14,7 +16,7 @@ mvn -B -ntp install
 java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar --help
 ```
 
-`core` 是可复用的普通 JAR；`example` 是包含依赖的可执行 JAR。业务项目安装本地构件后添加：
+`core` 是可复用的普通 JAR；`example` 是包含依赖的可执行 JAR，不发布到 Maven Central。业务项目安装本地构件后添加：
 
 ```xml
 <dependency>
@@ -271,6 +273,10 @@ var client = new DouyuClient(
 `Transport` 是异步传输扩展接口，可用于业务适配或测试注入；同一连接的回调必须有序。传入的 Transport 由客户端拥有并在关闭时释放。公共异步结果与内部锁隔离，后续任务通过 CompletableFuture 默认异步设施交付；推荐业务显式指定自己的执行器处理耗时的 Future 回调。
 
 状态通知有独立的有界队列。状态监听器应快速返回；通知队列耗尽会记录警告，不阻塞连接控制。业务也可以通过 status 查询当前状态。
+
+## 发布到 Maven Central
+
+正式发布使用 `central` 配置档，只上传父 POM 和 `douyu-connect-core`。当前版本是 `0.1.0-SNAPSHOT`，Central 不接收带 `-SNAPSHOT` 的正式版。令牌、GPG 私钥和斗鱼账号都不进入本仓库。步骤、命名空间和本机 `settings.xml` 写法见 [发布说明](docs/publishing.md)。
 
 ## 验证及来源
 
