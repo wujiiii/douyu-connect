@@ -4,3 +4,4 @@
 .env
 *.log
 .flattened-pom.xml
+docs/publishing.md

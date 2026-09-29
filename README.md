@@ -20,7 +20,7 @@ java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar 
 
 ```xml
 <dependency>
-  <groupId>io.github.douyuconnect</groupId>
+  <groupId>io.github.wujiiii</groupId>
   <artifactId>douyu-connect-core</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>
@@ -276,7 +276,7 @@ var client = new DouyuClient(
 
 ## 发布到 Maven Central
 
-正式发布使用 `central` 配置档，只上传父 POM 和 `douyu-connect-core`。当前版本是 `0.1.0-SNAPSHOT`，Central 不接收带 `-SNAPSHOT` 的正式版。令牌、GPG 私钥和斗鱼账号都不进入本仓库。步骤、命名空间和本机 `settings.xml` 写法见 [发布说明](docs/publishing.md)。
+Maven 坐标的 `groupId` 是 `io.github.wujiiii`，Java 包名仍是 `io.github.douyuconnect`。正式发布使用 `central` 配置档，只上传父 POM 和 `douyu-connect-core`。当前版本是 `0.1.0-SNAPSHOT`，Central 不接收带 `-SNAPSHOT` 的正式版。令牌、GPG 私钥和斗鱼账号都不进入本仓库。
 
 ## 验证及来源
 

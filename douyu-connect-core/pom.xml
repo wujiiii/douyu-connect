@@ -1,6 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <parent><groupId>io.github.douyuconnect</groupId><artifactId>douyu-connect-parent</artifactId><version>0.1.0-SNAPSHOT</version></parent>
+  <parent><groupId>io.github.wujiiii</groupId><artifactId>douyu-connect-parent</artifactId><version>0.1.0-SNAPSHOT</version></parent>
   <artifactId>douyu-connect-core</artifactId>
   <name>douyu-connect-core</name>
   <description>斗鱼直播间连接、协议解析与有序消息订阅。</description>
