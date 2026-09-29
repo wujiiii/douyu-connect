@@ -13,7 +13,7 @@ Java 17 的独立斗鱼连接库：动态连接/断开房间、同房间有序�
 ```shell
 mvn -B -ntp verify
 mvn -B -ntp install
-java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar --help
+java -jar douyu-connect-example/target/douyu-connect-example-0.1.0.jar --help
 ```
 
 `core` 是可复用的普通 JAR；`example` 是包含依赖的可执行 JAR，不发布到 Maven Central。业务项目安装本地构件后添加：
@@ -22,14 +22,14 @@ java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar 
 <dependency>
   <groupId>io.github.wujiiii</groupId>
   <artifactId>douyu-connect-core</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
 </dependency>
 ```
 
 匿名观察指定房间 10 秒（不加载账号、不发送弹幕）：
 
 ```shell
-java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar --douyu-tls --observe 4489985 10
+java -jar douyu-connect-example/target/douyu-connect-example-0.1.0.jar --douyu-tls --observe 4489985 10
 ```
 
 也可以只带 `--douyu-tls` 启动交互示例，输入 `connect 房间号`、`disconnect 房间号`、`status 房间号`、`reconnect 房间号 SEND`、`quit`。不带该选项则保留系统默认 TLS 配置。请使用实际数字房间 ID；短号/链接解析不在模块范围内。
@@ -276,7 +276,7 @@ var client = new DouyuClient(
 
 ## 发布到 Maven Central
 
-Maven 坐标的 `groupId` 是 `io.github.wujiiii`，Java 包名仍是 `io.github.douyuconnect`。正式发布使用 `central` 配置档，只上传父 POM 和 `douyu-connect-core`。当前版本是 `0.1.0-SNAPSHOT`，Central 不接收带 `-SNAPSHOT` 的正式版。令牌、GPG 私钥和斗鱼账号都不进入本仓库。
+Maven 坐标的 `groupId` 是 `io.github.wujiiii`，Java 包名仍是 `io.github.douyuconnect`。正式发布使用 `central` 配置档，只上传父 POM 和 `douyu-connect-core`。已发布版本是 `0.1.0`。令牌、GPG 私钥和斗鱼账号都不进入本仓库。
 
 ## 验证及来源
 

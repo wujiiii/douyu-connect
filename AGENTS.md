@@ -118,7 +118,7 @@ mvn -B -ntp install
 需要匿名收流验证时，先构建，再使用有时间上限的观察模式；该命令不启用发送：
 
 ```shell
-java -jar douyu-connect-example/target/douyu-connect-example-0.1.0-SNAPSHOT.jar --douyu-tls --observe ROOM_ID 3
+java -jar douyu-connect-example/target/douyu-connect-example-0.1.0.jar --douyu-tls --observe ROOM_ID 3
 ```
 
 将 `ROOM_ID` 替换为任务涉及的实际数字房间号。记录端点、就绪状态、观察时长、收包结果和退出状态；不要把自动测试、本地模拟、真实收流和真实发送验收混为一谈。
