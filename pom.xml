@@ -118,6 +118,7 @@
             <extensions>true</extensions>
             <configuration>
               <publishingServerId>central</publishingServerId>
+              <deploymentName>douyu-connect-${project.version}</deploymentName>
               <excludeArtifacts>
                 <excludeArtifact>douyu-connect-example</excludeArtifact>
               </excludeArtifacts>
