@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.github.wujiiii</groupId>
   <artifactId>douyu-connect-parent</artifactId>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
   <packaging>pom</packaging>
   <name>douyu-connect</name>
   <description>Java 17 的独立斗鱼连接库，提供房间连接、协议解析和有序消息订阅。</description>

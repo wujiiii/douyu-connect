@@ -20,6 +20,31 @@ import java.util.concurrent.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class NettyIntegrationTest {
+    @Test void invalidUtf8PacketIsReportedAndFollowingPacketStaysOnTheConnection() throws Exception {
+        try (Server server = new Server()) {
+            server.malformedThenGift = true;
+            BlockingQueue<ClientEvent> events = new LinkedBlockingQueue<>();
+            try (DouyuClient client = new DouyuClient(ClientTest.options(), new NettyTransport(), events::add)) {
+                BlockingQueue<GiftMessage> gifts = new LinkedBlockingQueue<>();
+                client.subscribe(GiftMessage.class, gifts::add);
+                ClientTest.await(client.connect("123", new ConnectionConfig(List.of(server.uri()), SenderConfig.disabled())));
+
+                assertNotNull(gifts.poll(2, TimeUnit.SECONDS));
+                ClientEvent protocolError;
+                do {
+                    protocolError = events.poll(2, TimeUnit.SECONDS);
+                    assertNotNull(protocolError);
+                } while (protocolError.kind() != ClientEvent.Kind.PROTOCOL_ERROR);
+                assertEquals(ConnectionState.READY, protocolError.state());
+                assertTrue(protocolError.detail().contains("packet=UTF8"));
+                assertTrue(protocolError.detail().contains(",offset="));
+                assertTrue(protocolError.detail().contains(",sha256="));
+                assertEquals(ConnectionState.READY, client.status("123").receive());
+                assertEquals(1, server.receiveLogins.get());
+            }
+        }
+    }
+
     @Test void rejectionAndExtensionFieldsSurviveActualWebSocketTransport() throws Exception {
         try (Server server = new Server(); DouyuClient client = new DouyuClient(ClientTest.options(),new NettyTransport(),event -> {})) {
             server.chatReply = "type@=chatres/res@=391/cd@=5/len@=50/extension@=retained/";
@@ -64,6 +89,7 @@ class NettyIntegrationTest {
         final ChannelGroup channels = new DefaultChannelGroup(group.next());
         final BlockingQueue<String> chats = new LinkedBlockingQueue<>();
         volatile String chatReply = "type@=chatres/res@=0/";
+        volatile boolean malformedThenGift;
         final java.util.concurrent.atomic.AtomicInteger receiveLogins = new java.util.concurrent.atomic.AtomicInteger();
         final java.util.concurrent.atomic.AtomicInteger sendLogins = new java.util.concurrent.atomic.AtomicInteger();
         final Channel server;
@@ -87,6 +113,16 @@ class NettyIntegrationTest {
                             reply(context,"type@=loginres/userid@=123/");
                         }
                         case "joingroup" -> {
+                            if (malformedThenGift) {
+                                byte[] malformed = PacketCodec.encode("type@=chatmsg/txt@=secret/", 690);
+                                malformed[12 + 18] = (byte) 0xc3;
+                                malformed[12 + 19] = 0x28;
+                                byte[] gift = PacketCodec.encode("type@=dgb/gfid@=0/pid@=123/hits@=3/", 690);
+                                byte[] joined = Arrays.copyOf(malformed, malformed.length + gift.length);
+                                System.arraycopy(gift, 0, joined, malformed.length, gift.length);
+                                context.writeAndFlush(new BinaryWebSocketFrame(Unpooled.wrappedBuffer(joined)));
+                                break;
+                            }
                             byte[] packet = PacketCodec.encode("type@=dgb/gfid@=0/pid@=123/hits@=3/",690);
                             context.write(new BinaryWebSocketFrame(false,0,Unpooled.wrappedBuffer(Arrays.copyOfRange(packet,0,8))));
                             context.writeAndFlush(new ContinuationWebSocketFrame(true,0,Unpooled.wrappedBuffer(Arrays.copyOfRange(packet,8,packet.length))));

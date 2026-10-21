@@ -1,7 +1,9 @@
 package io.github.douyuconnect.protocol;
 import java.nio.*;
 import java.nio.charset.*;
+import java.security.*;
 import java.util.*;
+import java.util.function.Consumer;
 public final class PacketCodec {
     private PacketCodec() {}
     public static byte[] encode(String text, int type) {
@@ -16,10 +18,16 @@ public final class PacketCodec {
     public static final class Decoder {
         private final ByteBuffer pending;
         private final int maxLength;
+        private final Consumer<PacketFormatException> discarded;
         private int expected = 4;
         public Decoder(int maxLength) {
+            this(maxLength, error -> { throw error; });
+        }
+        /** Discards only complete packets whose validated body is not strict UTF-8. */
+        public Decoder(int maxLength, Consumer<PacketFormatException> discarded) {
             if (maxLength < 9 || maxLength > 16 * 1024 * 1024) throw new IllegalArgumentException("Invalid packet limit");
             this.maxLength = maxLength;
+            this.discarded = Objects.requireNonNull(discarded, "discarded");
             pending = ByteBuffer.allocate(maxLength + 4).order(ByteOrder.LITTLE_ENDIAN);
         }
         public List<String> feed(ByteBuffer input) {
@@ -41,21 +49,39 @@ public final class PacketCodec {
                     || pending.getShort(10) != 0 || pending.get(expected - 1) != 0) {
                     throw malformed(PacketFormatException.Code.HEADER, length, type, null);
                 }
+                ByteBuffer content = pending.duplicate(); content.position(12); content.limit(expected - 1);
                 try {
-                    ByteBuffer content = pending.duplicate(); content.position(12); content.limit(expected - 1);
                     output.add(StandardCharsets.UTF_8.newDecoder().decode(content).toString());
                 } catch (CharacterCodingException e) {
-                    throw malformed(PacketFormatException.Code.UTF8, length, type, e);
+                    PacketFormatException error = malformed(PacketFormatException.Code.UTF8, length, type,
+                        content.position() - 12, sha256Body(), e);
+                    pending.clear(); expected = 4;
+                    discarded.accept(error);
+                    continue;
                 }
                 pending.clear(); expected = 4;
             }
             return output;
         }
         private PacketFormatException malformed(PacketFormatException.Code code, int declaredLength, int packetType, Throwable cause) {
+            return malformed(code, declaredLength, packetType, -1, "", cause);
+        }
+        private PacketFormatException malformed(PacketFormatException.Code code, int declaredLength, int packetType,
+                                                int bodyOffset, String bodySha256, Throwable cause) {
             int buffered = pending.position();
             byte[] prefix = new byte[Math.min(16, buffered)];
             ByteBuffer view = pending.duplicate(); view.position(0); view.limit(prefix.length); view.get(prefix);
-            return new PacketFormatException(code, declaredLength, packetType, buffered, prefix, cause);
+            return new PacketFormatException(code, declaredLength, packetType, buffered, prefix, bodyOffset, bodySha256, cause);
+        }
+        private String sha256Body() {
+            try {
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                ByteBuffer body = pending.duplicate(); body.position(12); body.limit(expected - 1);
+                digest.update(body);
+                return HexFormat.of().formatHex(digest.digest());
+            } catch (NoSuchAlgorithmException e) {
+                throw new AssertionError("SHA-256 unavailable", e);
+            }
         }
     }
 }

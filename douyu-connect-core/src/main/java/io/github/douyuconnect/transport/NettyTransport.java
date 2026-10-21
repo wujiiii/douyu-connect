@@ -82,7 +82,7 @@ public final class NettyTransport implements Transport {
         private final PacketCodec.Decoder decoder;
         private final AtomicBoolean notified = new AtomicBoolean();
         private volatile Channel channel;
-        Wire(Listener listener, int max) { this.listener = listener; decoder = new PacketCodec.Decoder(max); }
+        Wire(Listener listener, int max) { this.listener = listener; decoder = new PacketCodec.Decoder(max, listener::onPacketDiscarded); }
         public CompletionStage<Void> send(String text) {
             Channel current = channel;
             if (current == null || !current.isActive()) return CompletableFuture.failedFuture(new IllegalStateException("Channel unavailable"));

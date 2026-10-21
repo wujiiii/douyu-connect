@@ -13,7 +13,7 @@ Java 17 的独立斗鱼连接库：动态连接/断开房间、同房间有序�
 ```shell
 mvn -B -ntp verify
 mvn -B -ntp install
-java -jar douyu-connect-example/target/douyu-connect-example-0.1.0.jar --help
+java -jar douyu-connect-example/target/douyu-connect-example-0.1.1.jar --help
 ```
 
 `core` 是可复用的普通 JAR；`example` 是包含依赖的可执行 JAR，不发布到 Maven Central。业务项目安装本地构件后添加：
@@ -22,14 +22,14 @@ java -jar douyu-connect-example/target/douyu-connect-example-0.1.0.jar --help
 <dependency>
   <groupId>io.github.wujiiii</groupId>
   <artifactId>douyu-connect-core</artifactId>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
 </dependency>
 ```
 
 匿名观察指定房间 10 秒（不加载账号、不发送弹幕）：
 
 ```shell
-java -jar douyu-connect-example/target/douyu-connect-example-0.1.0.jar --douyu-tls --observe 4489985 10
+java -jar douyu-connect-example/target/douyu-connect-example-0.1.1.jar --douyu-tls --observe 4489985 10
 ```
 
 也可以只带 `--douyu-tls` 启动交互示例，输入 `connect 房间号`、`disconnect 房间号`、`status 房间号`、`reconnect 房间号 SEND`、`quit`。不带该选项则保留系统默认 TLS 配置。请使用实际数字房间 ID；短号/链接解析不在模块范围内。
@@ -157,6 +157,8 @@ client.subscribe(GiftMessage.class, gift -> {
 
 同一逻辑房间重连时，本地 sequence 继续递增，connectionId 改变；主动断开完成后再次 connect 会创建新的 roomInstanceId。sequence 不是服务端唯一 ID，不能用于跨断线去重。断线没有历史补发承诺。
 
+完整包通过长度和头部校验、但正文不是严格 UTF-8 时，该包会被丢弃并产生 `PROTOCOL_ERROR` 事件；当前连接继续读取下一包。被丢弃的包不会进入 STT、分类或订阅流，因此 sequence 不会为它递增，业务应将该事件视为明确的数据缺口。
+
 发送连接只用于控制和发送回执，不将其附带的聊天/礼物广播重复推入接收消息流。
 
 回调在共享工作池执行，不占用 Netty I/O 或心跳线程；同房间慢回调会延迟后续消息。队列达到上限时会报告 `QUEUE_OVERFLOW`，停止该房间全部连接、排空已接纳消息，不静默跳过后继续伪装连续。业务收到异常后应等待 disconnect 完成，再显式 connect；被拒绝的报文无法恢复。
@@ -185,7 +187,9 @@ uid 的范围为 `[10000, 19999)`，用户名数字部分为 `[1000000000, 19999
 
 状态为 DISCONNECTED、CONNECTING、AUTHENTICATING、READY、RETRY_WAIT、AUTH_FAILED。接收/发送分别维护。明确认证失败不无限重试，需要业务更新凭据或显式重连。主动 disconnect 后不会自动恢复。
 
-进入 `RETRY_WAIT` 时，`ClientEvent.detail` 只包含固定短语和异常类名，例如 `Connection closed / IOException` 或 `No inbound messages before idle timeout`。解包失败额外追加 `| packet=种类,声明长度,包类型,已缓冲字节数,包头十六进制`。种类是 `LENGTH`、`HEADER` 或 `UTF8`，包类型尚未读到时为 `-1`，包头最多 16 字节。这段详情没有异常消息、堆栈和包体。
+进入 `RETRY_WAIT` 时，`ClientEvent.detail` 只包含固定短语和异常类名，例如 `Connection closed / IOException` 或 `No inbound messages before idle timeout`。无法确定下一包边界的 `LENGTH`、`HEADER` 错误仍关闭连接，详情追加 `| packet=种类,声明长度,包类型,已缓冲字节数,包头十六进制`。包类型尚未读到时为 `-1`，包头最多 16 字节。
+
+已经确定完整包边界的 `UTF8` 错误不会关闭连接，而是产生状态保持不变的 `PROTOCOL_ERROR`，详情在相同五段前缀后追加正文内零基失败偏移与完整正文摘要：`,offset=偏移,sha256=摘要`。诊断不包含异常消息、堆栈或完整正文，也不会用替换字符将损坏数据送入业务解析。
 
 disconnect 完成后不会再交付旧连接消息；新连接使用新代次，迟到握手、旧定时器和旧关闭通知不能复活或污染新连接。断开正在排空时，connect 会明确拒绝，请先等待断开完成。回调长期阻塞会使断开超时报错；超时不表示该回调已被强制终止。
 
@@ -276,7 +280,7 @@ var client = new DouyuClient(
 
 ## 发布到 Maven Central
 
-Maven 坐标的 `groupId` 是 `io.github.wujiiii`，Java 包名仍是 `io.github.douyuconnect`。正式发布使用 `central` 配置档，只上传父 POM 和 `douyu-connect-core`。已发布版本是 `0.1.0`。令牌、GPG 私钥和斗鱼账号都不进入本仓库。
+Maven 坐标的 `groupId` 是 `io.github.wujiiii`，Java 包名仍是 `io.github.douyuconnect`。正式发布使用 `central` 配置档，只上传父 POM 和 `douyu-connect-core`。已发布版本是 `0.1.1`。令牌、GPG 私钥和斗鱼账号都不进入本仓库。
 
 ## 验证及来源
 

@@ -113,6 +113,7 @@ final class RoomSession {
             lane.wire = owner.transport.open(endpoint, owner.options.connectionTimeout(), owner.options.maxPacketLength(), new Transport.Listener() {
                 public void onOpen() { synchronized (RoomSession.this) { opened(lane, generation); } }
                 public void onMessage(String text) { synchronized (RoomSession.this) { message(lane, generation, text); } }
+                public void onPacketDiscarded(PacketFormatException cause) { synchronized (RoomSession.this) { packetDiscarded(lane, generation, cause); } }
                 public void onClosed(Throwable cause) { synchronized (RoomSession.this) { failed(lane, generation, false, closeDetail("Connection closed", cause)); } }
             });
             lane.deadline = owner.scheduler.schedule(() -> {
@@ -180,6 +181,12 @@ final class RoomSession {
             completed.result.complete(result);
             pump();
         }
+    }
+
+    private void packetDiscarded(Lane lane, long generation, PacketFormatException cause) {
+        if (!current(lane, generation)) return;
+        lane.lastActiveNanos = System.nanoTime();
+        event(lane, ClientEvent.Kind.PROTOCOL_ERROR, "Discarded malformed packet" + cause.diagnostic());
     }
 
     private void heartbeat(Lane lane, long generation) {

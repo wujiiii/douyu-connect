@@ -1,4 +1,5 @@
 package io.github.douyuconnect.transport;
+import io.github.douyuconnect.protocol.PacketFormatException;
 import java.net.URI;
 import java.time.Duration;
 import java.util.concurrent.CompletionStage;
@@ -13,6 +14,8 @@ public interface Transport extends AutoCloseable {
     interface Listener {
         void onOpen();
         void onMessage(String stt);
+        /** Reports a complete packet discarded without closing the connection. */
+        default void onPacketDiscarded(PacketFormatException cause) { }
         void onClosed(Throwable cause);
     }
     @Override void close();
